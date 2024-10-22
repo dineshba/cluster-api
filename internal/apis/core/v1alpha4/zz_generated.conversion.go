@@ -1154,6 +1154,7 @@ func Convert_v1alpha4_MachineDeploymentSpec_To_v1beta1_MachineDeploymentSpec(in 
 func autoConvert_v1beta1_MachineDeploymentSpec_To_v1alpha4_MachineDeploymentSpec(in *v1beta1.MachineDeploymentSpec, out *MachineDeploymentSpec, s conversion.Scope) error {
 	out.ClusterName = in.ClusterName
 	out.Replicas = (*int32)(unsafe.Pointer(in.Replicas))
+	// WARNING: in.RolloutBefore requires manual conversion: does not exist in peer-type
 	// WARNING: in.RolloutAfter requires manual conversion: does not exist in peer-type
 	out.Selector = in.Selector
 	if err := Convert_v1beta1_MachineTemplateSpec_To_v1alpha4_MachineTemplateSpec(&in.Template, &out.Template, s); err != nil {

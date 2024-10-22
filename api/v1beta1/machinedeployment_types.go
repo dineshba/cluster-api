@@ -105,6 +105,11 @@ type MachineDeploymentSpec struct {
 	// +optional
 	Replicas *int32 `json:"replicas,omitempty"`
 
+	// RolloutBefore is a field to indicate a rollout should be performed
+	// if the specified criteria is met.
+	// +optional
+	RolloutBefore *RolloutBefore `json:"rolloutBefore,omitempty"`
+
 	// RolloutAfter is a field to indicate a rollout should be performed
 	// after the specified time even if no changes have been made to the
 	// MachineDeployment.
@@ -155,6 +160,13 @@ type MachineDeploymentSpec struct {
 }
 
 // ANCHOR_END: MachineDeploymentSpec
+
+// RolloutBefore describes when a rollout should be performed on the KCP machines.
+type RolloutBefore struct {
+	// MachineExpiryDays indicates the number of days after which a rollout should be performed.
+	// +optional
+	MachineExpiryDays *int32 `json:"machineExpiryDays,omitempty"`
+}
 
 // ANCHOR: MachineDeploymentStrategy
 

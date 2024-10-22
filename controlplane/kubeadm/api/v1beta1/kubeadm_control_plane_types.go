@@ -161,6 +161,10 @@ type RolloutBefore struct {
 	// certificates of the machine will expire within the specified days.
 	// +optional
 	CertificatesExpiryDays *int32 `json:"certificatesExpiryDays,omitempty"`
+
+	// MachineExpiryDays includes the number of days after which a rollout should be performed.
+	// +optional
+	MachineExpiryDays *int32 `json:"machineExpiryDays,omitempty"`
 }
 
 // RolloutStrategy describes how to replace existing machines

@@ -550,6 +550,8 @@ func TestFindNewMachineSet(t *testing.T) {
 	rolloutAfter := metav1.NewTime(oneBeforeRolloutAfter.Add(time.Minute))
 	oneAfterRolloutAfter := metav1.NewTime(rolloutAfter.Add(time.Minute))
 	twoAfterRolloutAfter := metav1.NewTime(oneAfterRolloutAfter.Add(time.Minute))
+	oneDayBeforeRolloutAfter := metav1.NewTime(rolloutAfter.Add(-1 * 24 * time.Hour))
+	twoDayBeforeRolloutAfter := metav1.NewTime(rolloutAfter.Add(-2 * 24 * time.Hour))
 
 	deployment := generateDeployment("nginx")
 	deployment.Spec.Template.Spec.InfrastructureRef.Name = "new-infra-ref"
@@ -573,6 +575,17 @@ func TestFindNewMachineSet(t *testing.T) {
 
 	msCreatedAfterRolloutAfter := generateMS(deployment)
 	msCreatedAfterRolloutAfter.CreationTimestamp = oneAfterRolloutAfter
+
+	deploymentWithMachineExpiryOfOneDay := deployment.DeepCopy()
+	var oneDay int32 = 1
+	deploymentWithMachineExpiryOfOneDay.Spec.RolloutBefore = &clusterv1.RolloutBefore{
+		MachineExpiryDays: &oneDay,
+	}
+	msCreatedTwoDayBeforeRolloutAfter := generateMS(deployment)
+	msCreatedTwoDayBeforeRolloutAfter.CreationTimestamp = twoDayBeforeRolloutAfter
+
+	msCreatedOneDayBeforeRolloutAfter := generateMS(deployment)
+	msCreatedOneDayBeforeRolloutAfter.CreationTimestamp = oneDayBeforeRolloutAfter
 
 	tests := []struct {
 		Name               string
@@ -660,6 +673,22 @@ func TestFindNewMachineSet(t *testing.T) {
 			msList:             []*clusterv1.MachineSet{&msCreatedTwoBeforeRolloutAfter, &msCreatedAfterRolloutAfter},
 			reconciliationTime: &twoAfterRolloutAfter,
 			expected:           &msCreatedAfterRolloutAfter,
+		},
+		{
+			Name:               "Get nil if MachineSet created before RolloutBefore.MachineExpiryDays",
+			deployment:         *deploymentWithMachineExpiryOfOneDay,
+			msList:             []*clusterv1.MachineSet{&msCreatedTwoDayBeforeRolloutAfter},
+			reconciliationTime: &rolloutAfter,
+			expected:           nil,
+			createReason:       "RolloutBefore.MachineExpiryDays on MachineDeployment is reached, no MachineSet has been created afterwards",
+		},
+		{
+			Name:               "Get MachineSet created after expiry of RolloutBefore",
+			deployment:         *deploymentWithMachineExpiryOfOneDay,
+			msList:             []*clusterv1.MachineSet{&msCreatedTwoDayBeforeRolloutAfter, &msCreatedOneDayBeforeRolloutAfter},
+			reconciliationTime: &rolloutAfter,
+			expected:           &msCreatedOneDayBeforeRolloutAfter,
+			createReason:       "RolloutBefore.MachineExpiryDays on MachineDeployment is reached, no MachineSet has been created afterwards",
 		},
 	}
 

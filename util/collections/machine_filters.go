@@ -219,7 +219,8 @@ func ShouldRolloutAfter(reconciliationTime, rolloutAfter *metav1.Time) Func {
 }
 
 // ShouldRolloutBefore returns a filter to find all machine whose
-// certificates will expire within the specified days.
+// certificates will expire within the specified days or
+// machines that have been created for more than the specified days.
 func ShouldRolloutBefore(reconciliationTime *metav1.Time, rolloutBefore *controlplanev1.RolloutBefore) Func {
 	return func(machine *clusterv1.Machine) bool {
 		if rolloutBefore == nil || rolloutBefore.CertificatesExpiryDays == nil {
@@ -229,7 +230,14 @@ func ShouldRolloutBefore(reconciliationTime *metav1.Time, rolloutBefore *control
 			return false
 		}
 		certsExpiryTime := machine.Status.CertificatesExpiryDate.Time
-		return reconciliationTime.Add(time.Duration(*rolloutBefore.CertificatesExpiryDays) * 24 * time.Hour).After(certsExpiryTime)
+		if reconciliationTime.Add(time.Duration(*rolloutBefore.CertificatesExpiryDays) * 24 * time.Hour).After(certsExpiryTime) {
+			// rollout if the certificates will expire within the specified days
+			return true
+		}
+		if rolloutBefore.MachineExpiryDays == nil {
+			return false
+		}
+		return reconciliationTime.Sub(machine.ObjectMeta.CreationTimestamp.Time).Hours() > (time.Duration(*rolloutBefore.MachineExpiryDays) * 24).Hours()
 	}
 }
 

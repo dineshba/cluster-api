@@ -446,25 +446,35 @@ func FindNewMachineSet(deployment *clusterv1.MachineDeployment, msList []*cluste
 		return nil, fmt.Sprintf("couldn't find MachineSet matching MachineDeployment spec template: %s", strings.Join(diffs, ",")), nil
 	}
 
-	// If RolloutAfter is not set, pick the first matching MachineSet.
-	if deployment.Spec.RolloutAfter == nil {
-		return matchingMachineSets[0], "", nil
-	}
-
-	// If reconciliation time is before RolloutAfter, pick the first matching MachineSet.
-	if reconciliationTime.Before(deployment.Spec.RolloutAfter) {
-		return matchingMachineSets[0], "", nil
-	}
-
-	// Pick the first matching MachineSet that has been created after RolloutAfter.
-	for _, ms := range matchingMachineSets {
-		if ms.CreationTimestamp.After(deployment.Spec.RolloutAfter.Time) {
-			return ms, "", nil
+	if deployment.Spec.RolloutBefore == nil || deployment.Spec.RolloutBefore.MachineExpiryDays == nil {
+		// If RolloutAfter is not set, pick the first matching MachineSet.
+		// If reconciliation time is before RolloutAfter, pick the first matching MachineSet.
+		// Pick the first matching MachineSet that has been created after RolloutAfter.
+		// If no matching MachineSet was created after RolloutAfter, trigger creation of a new MachineSet.
+		return getMachineSetConsideringRolloutAfter(deployment.Spec.RolloutAfter, matchingMachineSets, reconciliationTime)
+	} else {
+		ms, reason, err := getMachineSetConsideringRolloutAfter(deployment.Spec.RolloutAfter, matchingMachineSets, reconciliationTime)
+		if err != nil {
+			return ms, reason, err
 		}
-	}
+		notExpired := reconciliationTime.Sub(ms.CreationTimestamp.Time).Hours() < (time.Duration(*deployment.Spec.RolloutBefore.MachineExpiryDays) * 24).Hours()
+		if notExpired {
+			return ms, reason, err
+		}
 
-	// If no matching MachineSet was created after RolloutAfter, trigger creation of a new MachineSet.
-	return nil, fmt.Sprintf("RolloutAfter on MachineDeployment set to %s, no MachineSet has been created afterwards", deployment.Spec.RolloutAfter.Format(time.RFC3339)), nil
+		for _, ms := range matchingMachineSets {
+			if !isExpired(deployment, ms, reconciliationTime) {
+				return ms, "", nil
+			}
+		}
+
+		return nil, "RolloutBefore.MachineExpiryDays on MachineDeployment is reached, no MachineSet has been created afterwards", nil
+	}
+}
+
+func isExpired(deployment *clusterv1.MachineDeployment, ms *clusterv1.MachineSet, reconciliationTime *metav1.Time) bool {
+	// return reconciliationTime.Sub(ms.CreationTimestamp.Time).Hours() > (time.Duration(*deployment.Spec.RolloutBefore.MachineExpiryDays) * 24).Hours()
+	return ms.CreationTimestamp.Time.Add(time.Duration(*deployment.Spec.RolloutBefore.MachineExpiryDays) * 24 * time.Hour).Before(reconciliationTime.Time)
 }
 
 // FindOldMachineSets returns the old machine sets targeted by the given Deployment, within the given slice of MSes.
@@ -735,4 +745,22 @@ func GetDeletingMachineCount(machineList *clusterv1.MachineList) int32 {
 		}
 	}
 	return deletingMachineCount
+}
+
+func getMachineSetConsideringRolloutAfter(rolloutAfter *metav1.Time, matchingMachineSets []*clusterv1.MachineSet, reconciliationTime *metav1.Time) (*clusterv1.MachineSet, string, error) {
+	if rolloutAfter == nil {
+		return matchingMachineSets[0], "", nil
+	}
+
+	if reconciliationTime.Before(rolloutAfter) {
+		return matchingMachineSets[0], "", nil
+	}
+
+	for _, ms := range matchingMachineSets {
+		if ms.CreationTimestamp.After(rolloutAfter.Time) {
+			return ms, "", nil
+		}
+	}
+
+	return nil, fmt.Sprintf("RolloutAfter on MachineDeployment set to %s, no MachineSet has been created afterwards", rolloutAfter.Format(time.RFC3339)), nil
 }

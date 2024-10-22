@@ -1178,6 +1178,17 @@ spec:
                   use "2023-03-09T09:00:00Z".
                 format: date-time
                 type: string
+              rolloutBefore:
+                description: |-
+                  RolloutBefore is a field to indicate a rollout should be performed
+                  if the specified criteria is met.
+                properties:
+                  machineExpiryDays:
+                    description: MachineExpiryDays indicates the number of days after
+                      which a rollout should be performed.
+                    format: int32
+                    type: integer
+                type: object
               selector:
                 description: |-
                   Label selector for machines. Existing MachineSets whose machines are

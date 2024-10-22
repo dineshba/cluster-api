@@ -4355,6 +4355,11 @@ spec:
                       certificates of the machine will expire within the specified days.
                     format: int32
                     type: integer
+                  machineExpiryDays:
+                    description: MachineExpiryDays includes the number of days after
+                      which a rollout should be performed.
+                    format: int32
+                    type: integer
                 type: object
               rolloutStrategy:
                 default:
